@@ -1,0 +1,44 @@
+body {
+	background-color: #352f5b;
+}
+
+.container {
+	/* max-width: 950px; */
+}
+
+input[type="text"],
+/* input[type="text"]:focus, */
+input[type="number"],
+input[type="number"]:focus ,input[type="text"]:focus {
+	color: #fff;
+	border: none;
+	background-color: rgba(0, 0, 0, 0.2);
+}
+li.list-group-item,
+li.list-header,
+li.relationship-list-group-item {
+	background-color: #4d4d4d;
+	color: #f8f9fa;
+}
+
+li.list-header{
+	padding: 0.5rem 1rem;
+	border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.delete {
+	cursor: pointer;
+}
+
+label.add {
+	margin-bottom: 15px;
+}
+
+.filtred {
+	display: none !important;
+}
+
+.hr_1 {
+	border: 3px solid white;
+	border-radius: 5px;
+}
