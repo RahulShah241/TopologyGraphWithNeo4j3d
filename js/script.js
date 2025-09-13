@@ -51,17 +51,19 @@ const start_node = document.getElementById("start_node");
 const end_node = document.getElementById("end_node");
 
 const relationshipUL = document.getElementById("relationship_ul");
-
+let RELATIONSHIP_COUNT = 1;
 const handleAddRelationship = () => {
   const html = `
-    <li class="relationship-list-group-item d-flex justify-content-between align-items-center">
-        <div class="relationship_list_node_id">${node_id.value}</div>
+    <li class="relationship-list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+        <div class="relationship_list_node_id">${RELATIONSHIP_COUNT}</div>
         <div class="relationship_list_node_time">${node_time.value}</div>
         <div class="relationship_list_start_node">${start_node.value}</div>
         <div class="relationship_list_end_node">${end_node.value}</div>
         <i class="far fa-trash-alt delete"></i>
     </li>
   `;
+  RELATIONSHIP_COUNT += 1;
+  node_id.value = RELATIONSHIP_COUNT;
   relationshipUL.innerHTML += html;
 };
 
@@ -84,9 +86,9 @@ const clearRelationship = () => {
   relationshipUL.innerHTML = "";
 };
 
-// ----------------------------
-// GRAPH CLASS FOR TOPO SORT
-// ----------------------------
+// ------------------------------------------------------------------------------------
+// ----------------------------- GRAPH CLASS FOR TOPO SORT ----------------------------
+// ------------------------------------------------------------------------------------
 class Graph {
   constructor(v) {
     this.V = v;
@@ -126,9 +128,9 @@ class Graph {
   }
 }
 
-// ----------------------------
-// CREATE GRAPH
-// ----------------------------
+// ------------------------------------------------------------------------------------
+// -------------------------------- CREATE GRAPH --------------------------------------
+// ------------------------------------------------------------------------------------
 const createGraph = () => {
   const taskArr = [];
   const relationshipArr = [];
@@ -151,7 +153,33 @@ const createGraph = () => {
 
     taskArrTopo.push({ name: taskName, hours: taskHours, labels: [taskName] });
   });
+  // DAG check function
+  function isDAG(numNodes, edges) {
+    const adj = new Array(numNodes).fill(null).map(() => []);
+    edges.forEach(({ startNode, endNode }) => {
+      adj[startNode].push(endNode);
+    });
 
+    const visited = new Array(numNodes).fill(false);
+    const recStack = new Array(numNodes).fill(false);
+
+    function dfs(v) {
+      visited[v] = true;
+      recStack[v] = true;
+      for (let i = 0; i < adj[v].length; i++) {
+        const neighbor = adj[v][i];
+        if (!visited[neighbor] && dfs(neighbor)) return true;
+        else if (recStack[neighbor]) return true;
+      }
+      recStack[v] = false;
+      return false;
+    }
+
+    for (let i = 0; i < numNodes; i++) {
+      if (!visited[i] && dfs(i)) return false;
+    }
+    return true;
+  }
   // Collect relationships
   document.querySelectorAll(".relationship-list-group-item").forEach((item) => {
     const input_node_id = Number(item.children[0].innerText);
@@ -171,6 +199,52 @@ const createGraph = () => {
       startNode: input_start_node - 1, // zero-based for Graph class
       endNode: input_end_node - 1,
     });
+  });
+  if (!isDAG(taskArr.length, relationshipArrTopo)) {
+    alert("Error: The graph contains a cycle and is not a DAG!");
+    return;
+  }
+
+  // ---- CALCULATE EARLIEST START TIMES ----
+  function calculateStartTimes(numTasks, edges, taskHours) {
+    // Build adjacency list and in-degree array
+    const adj = new Array(numTasks).fill(null).map(() => []);
+    const inDegree = new Array(numTasks).fill(0);
+    edges.forEach(({ startNode, endNode }) => {
+      adj[startNode].push(endNode);
+      inDegree[endNode]++;
+    });
+
+    // Initialize start times
+    const startTimes = new Array(numTasks).fill(0);
+
+    // Topological sort using Kahn's algorithm
+    const queue = [];
+    for (let i = 0; i < numTasks; i++) {
+      if (inDegree[i] === 0) queue.push(i);
+    }
+
+    while (queue.length > 0) {
+      const u = queue.shift();
+      for (const v of adj[u]) {
+        // Earliest start for v is max of current or u's finish time
+        startTimes[v] = Math.max(startTimes[v], startTimes[u] + Number(taskHours[u]));
+        inDegree[v]--;
+        if (inDegree[v] === 0) queue.push(v);
+      }
+    }
+    return startTimes;
+  }
+
+  // Get hours for each task in topo array
+  const hoursArr = taskArrTopo.map((task) => task.hours);
+
+  // Calculate start times
+  const startTimes = calculateStartTimes(taskArrTopo.length, relationshipArrTopo, hoursArr);
+
+  // Attach start times to resultTopo
+  resultTopo.forEach((node, idx) => {
+    node.properties.start = startTimes[idx];
   });
 
   // ---------------- TOPO SORT ----------------
@@ -220,6 +294,8 @@ const createGraph = () => {
     const topoGraphData = {
       results: [
         {
+          columns: ["user", "entity"],
+
           data: [
             {
               graph: {
@@ -234,6 +310,6 @@ const createGraph = () => {
 
     console.log("Topo Graph Data for Neo4jd3:", topoGraphData);
 
-    new Neo4jd3("#Tgraph", { neo4jData: topoGraphData });
+    new Neo4jd3("#Tgraph", { neo4jData: topoGraphData, nodeCaption: (d) => d.properties.name });
   }
 };
